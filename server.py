@@ -742,7 +742,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     return
                 token = secrets.token_urlsafe(32)
                 existing_names = [row[0] for row in conn.execute("SELECT name FROM devices WHERE owner_id=?", (user["id"],)).fetchall()]
-                numbers = [int(match.group(1)) for existing_name in existing_names if (match := re.fullmatch(r"Bulb(?: (\d+))?", existing_name))]
+                # Reuse the first bulb if setup is retried before its NodeMCU
+                # has reported telemetry. This avoids duplicate offline bulbs.
+                pending_bulb = conn.execute(
+                    "SELECT id FROM devices WHERE owner_id=? AND name='Bulb' AND last_seen IS NULL ORDER BY created_at,id LIMIT 1",
+                    (user["id"],),
+                ).fetchone()
+                if pending_bulb:
+                    conn.execute(
+                        "UPDATE devices SET token_hash=?,hardware_id=NULL,created_at=? WHERE id=?",
+                        (token_hash(token), now_iso(), pending_bulb["id"]),
+                    )
+                    return self.send_json({"deviceId": pending_bulb["id"], "deviceToken": token})
+
+                numbers = [int(match.group(1) or 1) for existing_name in existing_names if (match := re.fullmatch(r"Bulb(?: (\d+))?", existing_name))]
                 device_number = max(numbers, default=0) + 1
                 device_id = "esp-" + uuid.uuid4().hex[:12]
                 name = "Bulb" if device_number == 1 else f"Bulb {device_number}"
