@@ -1,0 +1,10 @@
+{
+  "host": "127.0.0.1",
+  "port": 8080,
+  "database": "data/homesense.sqlite3",
+  "ldr_dark_raw": 0,
+  "ldr_bright_raw": 1023,
+  "online_timeout_seconds": 60,
+  "cookie_secure": false
+}
+

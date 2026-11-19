@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: esp8266-bulb-control
+    runtime: python
+    plan: starter
+    buildCommand: python -m compileall -q server.py
+    startCommand: python server.py
+    healthCheckPath: /healthz
+    disk:
+      name: esp8266-bulb-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: HOMESENSE_HOST
+        value: 0.0.0.0
+      - key: HOMESENSE_DB
+        value: /var/data/homesense.sqlite3
+      - key: HOMESENSE_COOKIE_SECURE
+        value: "true"
+

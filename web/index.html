@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#eef5ff">
+  <meta name="description" content="A clear view of home comfort, appliance energy use, and costs.">
+  <title>ESP8266 Bulb Control and Power Consumption</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js?v=connect-wifi-bulb-onoff-20261120-5" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <div class="app-frame">
+    <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+      <a class="brand" href="#/home" aria-label="ESP8266 Bulb Control home">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M4 15.2 16 5l12 10.2v12.3a1.5 1.5 0 0 1-1.5 1.5h-7.2v-9h-6.6v9H5.5A1.5 1.5 0 0 1 4 27.5z"/><path d="M12.8 13.2c.8-1.4 2-2.1 3.6-2.1 2.6 0 4.4 1.9 4.4 4.5 0 1.9-1 3.3-2.6 4.1v2h-4.4v-2c-1.7-.8-2.6-2.2-2.6-4.1 0-.9.2-1.7.6-2.4"/></svg></span>
+        <span class="brand-copy"><strong>ESP8266 Bulb Control</strong><small>Power Consumption</small></span>
+      </a>
+      <div class="side-group" id="app-navigation">
+        <span class="side-label">YOUR HOME</span>
+        <a href="#/dashboard" class="nav-link" data-route="dashboard"><span class="nav-icon">⌂</span>Home</a>
+        <a href="#/analytics" class="nav-link" data-route="analytics"><span class="nav-icon">▥</span>Energy & costs</a>
+        <a href="#/live" class="nav-link" data-route="live"><span class="nav-icon">⌁</span>Home comfort</a>
+        <a href="#/control" class="nav-link" data-route="control"><span class="nav-icon">◉</span>Appliances</a>
+        <button type="button" class="nav-link nav-action-link" data-action="open-add-appliance"><span class="nav-icon">⌁</span>Connect to Wi-Fi</button>
+        <a href="#/devices" class="nav-link" data-route="devices"><span class="nav-icon">⌁</span>Connections</a>
+        <a href="#/notifications" class="nav-link" data-route="notifications"><span class="nav-icon">♧</span>Activity<span class="nav-count" id="nav-unread" hidden>0</span></a>
+        <span class="side-label side-label-spaced">PREFERENCES</span>
+        <a href="#/settings" class="nav-link" data-route="settings"><span class="nav-icon">⚙</span>Settings</a>
+        <a href="#/help" class="nav-link" data-route="help"><span class="nav-icon">?</span>Help & support</a>
+      </div>
+      <div class="sidebar-bottom">
+        <div class="connection-mini"><span class="status-dot" id="side-status-dot"></span><span><strong id="side-status">Home connection</strong><small id="side-status-detail">Ready when you are</small></span></div>
+        <a href="#/home" class="side-home-link">⌂ &nbsp;ESP8266 Bulb Control</a>
+        <div class="sidebar-note">A better view of home<br>Energy · Comfort · Control</div>
+      </div>
+    </aside>
+
+    <section class="workspace">
+      <header class="topbar">
+        <button class="icon-button mobile-menu" type="button" aria-label="Open navigation" data-action="menu">☰</button>
+        <div class="breadcrumbs" id="breadcrumbs"><span>ESP8266 Bulb Control</span><span class="crumb-sep">/</span><strong>Home</strong></div>
+        <div class="topbar-actions">
+          <label class="search-box"><span aria-hidden="true">⌕</span><input id="nav-search" type="search" placeholder="Find a page…" aria-label="Search navigation"><kbd>⌘ K</kbd></label>
+          <a class="icon-button notification-button" href="#/notifications" aria-label="Notifications">♧<span class="notification-ping" id="top-ping" hidden></span></a>
+          <button class="user-chip" type="button" data-action="user-menu" aria-label="Open account menu"><span class="avatar" id="user-avatar">H</span><span class="user-chip-text"><strong id="user-name">Guest</strong><small id="user-email">Welcome</small></span><span class="caret">⌄</span></button>
+          <div class="user-menu" id="user-menu" hidden><a href="#/settings">Profile & settings</a><button type="button" data-action="logout">Sign out</button></div>
+        </div>
+      </header>
+      <main id="main-content" tabindex="-1"><div class="initial-loader"><span class="spinner"></span><p>Loading ESP8266 Bulb Control…</p></div></main>
+    </section>
+  </div>
+  <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
+  <div class="sidebar-scrim" id="sidebar-scrim" data-action="close-menu"></div>
+</body>
+</html>
+
