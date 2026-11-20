@@ -17,6 +17,7 @@ import sqlite3
 import sys
 import threading
 import time
+import urllib.request
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
@@ -411,7 +412,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "same-origin")
         self.send_header("X-Frame-Options", "DENY")
-        self.send_header("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'")
+        self.send_header("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https://*.firebaseio.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'")
         self.send_header("Cache-Control", "no-store" if self.path.startswith("/api/") else "no-cache")
         for key, value in (extra or {}).items():
             self.send_header(key, value)
@@ -1008,6 +1009,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     return self.send_error_json(409, "A relay command is already in progress")
                 command_id = uuid.uuid4().hex
                 conn.execute("INSERT INTO commands(id,device_id,user_id,desired_state,created_at) VALUES(?,?,?,?,?)", (command_id, device_id, user["id"], int(state), now_iso()))
+                firebase_send_bulb(state)  # NodeMCU picks this up from Firebase /turn
                 return self.send_json({"commandId": command_id, "status": "queued"}, 202)
 
         if path == "/api/notifications/read-all":
@@ -1109,7 +1111,83 @@ def reset_auth_attempts(ip):
     AUTH_ATTEMPTS.pop(ip, None)
 
 
+FIREBASE_DB_URL = os.environ.get("FIREBASE_DB_URL", "https://iotbasedbulbonoff-default-rtdb.firebaseio.com").rstrip("/")
+FIREBASE_AUTH = os.environ.get("FIREBASE_AUTH", "")
+
+
+def firebase_call(method, path, value=None):
+    """Tiny Firebase Realtime Database REST helper. Returns parsed JSON or None on failure."""
+    url = f"{FIREBASE_DB_URL}/{path}.json" + (f"?auth={FIREBASE_AUTH}" if FIREBASE_AUTH else "")
+    data = None if value is None else json.dumps(value).encode("utf-8")
+    req = urllib.request.Request(url, data=data, method=method, headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            return json.loads(resp.read() or b"null")
+    except Exception as exc:
+        print(f"Firebase {method} {path} failed: {exc}", file=sys.stderr)
+        return None
+
+
+def firebase_send_bulb(state):
+    """Website -> Firebase: the NodeMCU polls /turn and switches the relay."""
+    firebase_call("PUT", "turn", "on" if state else "off")
+
+
+def firebase_sync_once():
+    """Firebase -> website: copy the NodeMCU's /status into the readings tables."""
+    status = firebase_call("GET", "status")
+    if not isinstance(status, dict) or not isinstance(status.get("updatedAt"), (int, float)):
+        return
+    seen = datetime.fromtimestamp(status["updatedAt"] / 1000, timezone.utc)
+    if (now_dt() - seen).total_seconds() > int(CFG["online_timeout_seconds"]):
+        return
+    stamp = seen.isoformat(timespec="seconds")
+    relay = status.get("relayOn") is True
+    try:
+        temp = clean_float(status.get("temperature"), "temperature", -40, 80)
+        humidity = clean_float(status.get("humidity"), "humidity", 0, 100)
+    except ValueError:
+        return
+    raw = status.get("ldrRaw")
+    raw = raw if isinstance(raw, int) and not isinstance(raw, bool) and 0 <= raw <= 1023 else None
+    rssi = status.get("wifiRssi")
+    rssi = rssi if isinstance(rssi, int) and -127 <= rssi <= 0 else None
+    pct = level = None
+    if raw is not None:
+        dark, bright = int(CFG["ldr_dark_raw"]), int(CFG["ldr_bright_raw"])
+        pct = round(max(0, min(100, (raw - dark) * 100 / (bright - dark))), 2)
+        level = "Low" if pct < 33 else ("Medium" if pct < 67 else "High")
+    with db() as conn:
+        for device in conn.execute("SELECT * FROM devices WHERE name='Bulb'").fetchall():
+            if device["last_seen"] and device["last_seen"] >= stamp:
+                continue  # nothing new from the NodeMCU
+            conn.execute("INSERT INTO readings(device_id,temperature,humidity,ldr_raw,light_pct,light_level,power_w,relay_on,wifi_rssi,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                         (device["id"], temp, humidity, raw, pct, level, None, int(relay), rssi, stamp))
+            conn.execute("UPDATE devices SET last_seen=?,online_state=1,relay_on=?,current_power_w=NULL,wifi_rssi=?,firmware_version='firebase',ip_address='Firebase' WHERE id=?",
+                         (stamp, int(relay), rssi, device["id"]))
+            if device["relay_on"] is None or bool(device["relay_on"]) != relay:
+                conn.execute("INSERT INTO appliance_events(device_id,user_id,state,source,created_at) VALUES(?,?,?,?,?)",
+                             (device["id"], device["owner_id"], int(relay), "web", stamp))
+                notify(conn, device["owner_id"], device["id"], "appliance", "Bulb switched on" if relay else "Bulb switched off", f"{device['name']} reports the bulb {'on' if relay else 'off'}.")
+            # The NodeMCU confirmed the relay state: finish matching commands, expire stale ones.
+            conn.execute("UPDATE commands SET status='complete',completed_at=? WHERE device_id=? AND status IN ('pending','delivered') AND desired_state=?",
+                         (now_iso(), device["id"], int(relay)))
+            expire = (now_dt() - timedelta(minutes=1)).isoformat(timespec="seconds")
+            conn.execute("UPDATE commands SET status='failed',completed_at=?,error='NodeMCU did not confirm in time' WHERE device_id=? AND status IN ('pending','delivered') AND created_at<?",
+                         (now_iso(), device["id"], expire))
+
+
+def firebase_sync_loop():
+    while True:
+        try:
+            firebase_sync_once()
+        except Exception as exc:
+            print(f"Firebase sync error: {exc}", file=sys.stderr)
+        time.sleep(3)
+
+
 def run():
+    threading.Thread(target=firebase_sync_loop, daemon=True).start()
     host = CFG["host"]
     port = CFG["port"]
     class Server(http.server.ThreadingHTTPServer):
@@ -1149,4 +1227,3 @@ def run():
 
 if __name__ == "__main__":
     run()
-

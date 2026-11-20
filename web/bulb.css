@@ -1,0 +1,14 @@
+body{font-family:system-ui,sans-serif;background:#10141c;color:#e8ecf3;margin:0}
+main{max-width:520px;margin:0 auto;padding:24px 16px}
+h1{margin:0 0 12px}
+.card{background:#1a2030;border-radius:14px;padding:18px;text-align:center;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid .card{display:flex;flex-direction:column;gap:6px}
+.grid b{font-size:1.4rem}
+.bulb{font-size:72px;transition:.3s}.bulb.off{filter:grayscale(1) opacity(.4)}
+.bulb.on{filter:drop-shadow(0 0 18px #ffd34d)}
+button{font-size:1rem;padding:12px 22px;margin:4px;border:0;border-radius:10px;background:#4caf7a;color:#fff;cursor:pointer}
+button.secondary{background:#5b6475}
+.pill{display:inline-block;padding:4px 12px;border-radius:99px;background:#444;font-size:.85rem}
+.pill.ok{background:#1f7a4d}.pill.bad{background:#8a2f2f}
+.muted{color:#8a93a6;font-size:.85rem}

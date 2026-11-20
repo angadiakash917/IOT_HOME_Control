@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bulb Control (Firebase)</title>
+<link rel="stylesheet" href="bulb.css">
+</head>
+<body>
+<main>
+  <h1>Bulb Control</h1>
+  <p id="conn" class="pill">Connecting…</p>
+  <div class="card">
+    <div id="bulb" class="bulb off">💡</div>
+    <p>Bulb is <strong id="state">—</strong></p>
+    <button id="on">Turn ON</button>
+    <button id="off" class="secondary">Turn OFF</button>
+  </div>
+  <div class="grid">
+    <div class="card"><span>Temperature</span><b id="temp">—</b></div>
+    <div class="card"><span>Humidity</span><b id="hum">—</b></div>
+    <div class="card"><span>Light</span><b id="ldr">—</b></div>
+    <div class="card"><span>Wi-Fi</span><b id="rssi">—</b></div>
+  </div>
+  <p class="muted" id="seen"></p>
+</main>
+<script src="bulb.js"></script>
+</body>
+</html>
