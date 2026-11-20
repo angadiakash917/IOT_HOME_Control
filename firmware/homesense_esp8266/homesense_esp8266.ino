@@ -22,7 +22,9 @@ constexpr uint8_t LDR_PIN = A0;  // NodeMCU analog input
 constexpr uint8_t DHT_TYPE = DHT11;
 constexpr bool RELAY_ACTIVE_LOW = true;
 constexpr uint32_t CLOUD_INTERVAL_MS = 3000;
-constexpr uint32_t WIFI_RETRY_MS = 10000;
+// Let the ESP8266 complete a full association/authentication attempt before retrying.
+constexpr uint32_t WIFI_RETRY_MS = 30000;
+constexpr uint32_t WIFI_STATUS_LOG_MS = 5000;
 constexpr uint32_t CLOUD_FAILSAFE_MS = 30000;
 
 const char ROOT_CA[] PROGMEM = R"ROOTCA(
@@ -107,9 +109,11 @@ DHT dht(DHT_PIN, DHT_TYPE);
 bool relayOn = false;
 uint32_t lastCloudAt = 0;
 uint32_t lastWiFiAttemptAt = 0;
+uint32_t lastWiFiStatusAt = 0;
 uint32_t lastCloudOkAt = 0;
 uint32_t lastTimeSyncAttemptAt = 0;
 bool timeReady = false;
+bool wifiWasConnected = false;
 
 void setRelay(bool on) {
   relayOn = on;
@@ -201,7 +205,22 @@ void connectWiFi() {
   WiFi.setAutoReconnect(true);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   lastWiFiAttemptAt = millis();
-  Serial.printf("Connecting to Wi-Fi: %s\n", WIFI_SSID);
+  lastWiFiStatusAt = lastWiFiAttemptAt;
+  Serial.printf("Starting Wi-Fi connection attempt for SSID: %s\n", WIFI_SSID);
+}
+
+void logWiFiStatus() {
+  const int status = static_cast<int>(WiFi.status());
+  Serial.printf("Wi-Fi still disconnected; status code %d. ", status);
+  if (status == static_cast<int>(WL_NO_SSID_AVAIL)) {
+    Serial.println("Network not found: check the exact SSID, 2.4 GHz band, and hotspot visibility.");
+  } else if (status == static_cast<int>(WL_CONNECT_FAILED)) {
+    Serial.println("Authentication/join failed: recheck the password and use WPA2-Personal if available.");
+  } else if (status == static_cast<int>(WL_IDLE_STATUS)) {
+    Serial.println("The ESP8266 is still attempting to join; waiting for the result.");
+  } else {
+    Serial.println("No Wi-Fi association yet; see the numeric status code for the installed ESP8266 core.");
+  }
 }
 
 void setup() {
@@ -215,11 +234,22 @@ void setup() {
 
 void loop() {
   const uint32_t now = millis();
-  if (WiFi.status() != WL_CONNECTED) {
+  const bool wifiConnected = WiFi.status() == WL_CONNECTED;
+  if (!wifiConnected) {
+    wifiWasConnected = false;
     if (relayOn && now - lastCloudOkAt >= CLOUD_FAILSAFE_MS) setRelay(false);
     if (now - lastWiFiAttemptAt >= WIFI_RETRY_MS) connectWiFi();
+    if (now - lastWiFiStatusAt >= WIFI_STATUS_LOG_MS) {
+      lastWiFiStatusAt = now;
+      logWiFiStatus();
+    }
     delay(10);
     return;
+  }
+  if (!wifiWasConnected) {
+    wifiWasConnected = true;
+    Serial.printf("Wi-Fi connected. IP: %s, RSSI: %d dBm\n",
+                  WiFi.localIP().toString().c_str(), WiFi.RSSI());
   }
   if (!timeReady && (lastTimeSyncAttemptAt == 0 || now - lastTimeSyncAttemptAt >= 30000)) {
     lastTimeSyncAttemptAt = now;
@@ -246,4 +276,3 @@ void loop() {
   }
   delay(10);
 }
-
