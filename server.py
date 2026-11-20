@@ -1158,6 +1158,12 @@ def firebase_sync_once():
         pct = round(max(0, min(100, (raw - dark) * 100 / (bright - dark))), 2)
         level = "Low" if pct < 33 else ("Medium" if pct < 67 else "High")
     with db() as conn:
+        # One physical bulb: if nobody has a "Bulb" yet, give it to the first (owner) account.
+        if not conn.execute("SELECT 1 FROM devices WHERE name='Bulb' LIMIT 1").fetchone():
+            owner = conn.execute("SELECT id FROM users ORDER BY id LIMIT 1").fetchone()
+            if owner:
+                conn.execute("INSERT INTO devices(id,owner_id,name,rated_watts,token_hash,created_at) VALUES(?,?,?,?,?,?)",
+                             ("fb-" + uuid.uuid4().hex[:12], owner["id"], "Bulb", 60, token_hash(secrets.token_urlsafe(32)), now_iso()))
         for device in conn.execute("SELECT * FROM devices WHERE name='Bulb'").fetchall():
             if device["last_seen"] and device["last_seen"] >= stamp:
                 continue  # nothing new from the NodeMCU

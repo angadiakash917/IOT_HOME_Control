@@ -7,6 +7,7 @@ async function setBulb(value) {
   try {
     const r = await fetch(`${DB}/turn.json`, { method: "PUT", body: JSON.stringify(value) });
     if (!r.ok) throw new Error(r.status);
+    render();   // clear "sending…"; the real state arrives from the NodeMCU
   } catch (e) {
     $("state").textContent = "error – check database rules";
   }
